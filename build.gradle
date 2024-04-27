@@ -1,0 +1,77 @@
+plugins {
+    id 'fabric-loom' version '1.6-SNAPSHOT'
+    id 'maven-publish'
+    id "com.diffplug.spotless" version "6.25.0"
+    id 'dev.clojurephant.clojure' version '0.8.0-beta.7'
+}
+
+def ENV = System.getenv()
+
+archives_base_name = project.archives_base_name
+group = project.maven_group
+
+version = "${project.mod_version}+clojure.${project.clojure_version}" + (ENV.GITHUB_ACTIONS ? "" : ".local")
+
+repositories {
+    maven {
+        name = 'clojars'
+        url = 'https://repo.clojars.org'
+    }
+}
+
+dependencies {
+    // To change the versions see the gradle.properties file
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+    testImplementation "net.fabricmc:fabric-loader-junit:${project.loader_version}"
+    testImplementation "dev.clojurephant:jovial:0.4.2"
+
+    implementation "org.clojure:clojure:${project.clojure_version}"
+    devImplementation 'org.clojure:tools.namespace:1.5.0'
+}
+
+processResources {
+    inputs.property "version", project.version
+    filteringCharset "UTF-8"
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}
+
+java {
+    withSourcesJar()
+}
+
+jar {
+    from("LICENSE") {
+        rename { "${it}_${project.archivesBaseName}"}
+    }
+}
+
+// configure the maven publication
+publishing {
+    publications {
+        create("mavenJava", MavenPublication) {
+            from components.java
+        }
+    }
+
+    repositories {
+        if (ENV.MAVEN_URL) {
+            maven {
+                url ENV.MAVEN_URL
+                credentials {
+                    username ENV.MAVEN_USERNAME
+                    password ENV.MAVEN_PASSWORD
+                }
+            }
+        }
+    }
+}

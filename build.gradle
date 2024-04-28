@@ -1,3 +1,7 @@
+import net.fabricmc.loom.util.gradle.SourceSetHelper
+
+import java.util.stream.Collectors
+
 plugins {
     id 'fabric-loom' version '1.6-SNAPSHOT'
     id 'maven-publish'
@@ -13,6 +17,7 @@ group = project.maven_group
 version = "${project.mod_version}+clojure.${project.clojure_version}" + (ENV.GITHUB_ACTIONS ? "" : ".local")
 
 repositories {
+    mavenCentral()
     maven {
         name = 'clojars'
         url = 'https://repo.clojars.org'
@@ -26,9 +31,9 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
     testImplementation "net.fabricmc:fabric-loader-junit:${project.loader_version}"
-    testImplementation "dev.clojurephant:jovial:0.4.2"
+    testRuntimeOnly "dev.clojurephant:jovial:0.4.2"
 
-    implementation "org.clojure:clojure:${project.clojure_version}"
+    include(api "org.clojure:clojure:${project.clojure_version}")
     devImplementation 'org.clojure:tools.namespace:1.5.0'
 }
 
@@ -43,15 +48,43 @@ processResources {
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
+    afterEvaluate {
+        // See: https://github.com/FabricMC/fabric-loader/pull/585
+        def classPathGroups = loom.mods.stream()
+                .map { modSettings ->
+                    def classPath = SourceSetHelper.getClasspath(modSettings, getProject()).stream()
+                            .map(File.&getAbsolutePath)
+                            .collect(Collectors.joining(File.pathSeparator))
+                    println classPath
+                    classPath
+                }
+                .collect(Collectors.joining(File.pathSeparator+File.pathSeparator))
+        println classPathGroups
+        systemProperty("fabric.classPathGroups", classPathGroups)
+    }
 }
 
 java {
     withSourcesJar()
 }
 
+clojure.builds {
+    main {
+        classpath.from = sourceSets.main.compileClasspath
+        checkAll()
+        aotAll()
+        reflection = "fail"
+    }
+}
+
+compileJava {
+    // add clojure's compiled output onto the Java compiler output
+    classpath += files(sourceSets.main.clojure.classesDirectory)
+}
+
 jar {
     from("LICENSE") {
-        rename { "${it}_${project.archivesBaseName}"}
+        rename { "${it}_${project.archives_base_name}"}
     }
 }
 

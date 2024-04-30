@@ -5,5 +5,5 @@
     :implements [net.fabricmc.loader.api.LanguageAdapter]
     :prefix "-"))
 
-(defn -create [mod value type]
+(defn -create [_this mod value type]
   (.create (LanguageAdapter/getDefault) mod value type))
